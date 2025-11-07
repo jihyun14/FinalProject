@@ -58,7 +58,8 @@ public class SecurityConfig {
 				.authorizeHttpRequests((authorizeHttpRequests) -> authorizeHttpRequests
 						.requestMatchers(PERMIT_URL).permitAll()
 						.requestMatchers("/auth/**").authenticated() //인증 필요
-						.anyRequest().authenticated()
+						//.anyRequest().authenticated()
+						.anyRequest().permitAll() //테스트용(모두허용)
 				)
 				.authenticationProvider(authenticationProvider())
 				// API 요청이 들어올 때마다 JWT 토큰을 검증할 커스텀 필터 => JwtAuthenticationFilter

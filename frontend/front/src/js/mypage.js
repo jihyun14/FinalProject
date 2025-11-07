@@ -66,7 +66,7 @@ function initMypageListeners() {
               value="" placeholder="${currentNick}">
           </div>
         `,
-        onConfirm: (data) => {
+        /*onConfirm: (data) => {
           const newNick = (data.nickname || "").trim();
           if (newNick) {
             localStorage.setItem(NICK_KEY, newNick);
@@ -78,6 +78,30 @@ function initMypageListeners() {
             showToast("닉네임을 입력해주세요.", "error");
             return false;
           }
+        },*/
+        // mypage.js의 'open-profile' (닉네임 변경) onConfirm 부분
+
+        onConfirm: async (data) => {
+          const newNick = (data.nickname || "").trim();
+          if (newNick) {
+            try {
+              // ⚠️ [테스트용] ID를 하드코딩합니다 (예: 1번 사용자)
+              const currentUserId = 1;
+
+              // 1. [수정] api.js 함수 호출
+              await updateNickname(currentUserId, newNick);
+
+              localStorage.setItem(NICK_KEY, newNick);
+              if (typeof updateNicknameDisplay === "function") {
+                updateNicknameDisplay();
+              }
+              showToast("닉네임 저장 완료", "success");
+            } catch (error) {
+              showToast("닉네임 변경 실패", "error");
+              return false;
+            }
+          }
+          // ... (이하 생략)
         },
       });
     } else if (action === "open-security") {
