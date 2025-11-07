@@ -7,6 +7,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -138,15 +139,26 @@ public class MemberApiController {
 			// 현재 비밀번호가 틀린 경우
 			 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
 					 .body(Map.of("status","error","message", e.getMessage()));
-		}
-		
-		
+		}		
 		
 	}
 	
-	
-	
-	
+	@DeleteMapping("/user/{userId}")
+	public ResponseEntity<?> deleteUser(
+			@PathVariable("userId") Long userId){
+		
+		try {
+			memberService.deleteUser(userId);
+			return ResponseEntity.ok(Map.of("status","success","message","회원 탈퇴 완료"));
+			
+		} catch (LoginFailedException e) {
+			// 사용자를 찾지 못한 경우
+			return ResponseEntity.status(HttpStatus.NOT_FOUND)
+					.body(Map.of("status","error","message",e.getMessage()));
+		}
+		
+		
+	}
 	
 	
 	

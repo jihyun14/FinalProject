@@ -10,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.prinCipal.chatbot.exception.LoginFailedException;
 import com.prinCipal.chatbot.exception.SignupValidationException;
@@ -129,6 +130,7 @@ public class MemberService{
 	}
 	
 	//닉네임 변경
+	@Transactional
 	public void updateNickname(Long userId, String newNickname) {
 		// 닉네임 중복 검사
 		if(memberRepository.existsByNickname(newNickname)) {
@@ -143,6 +145,7 @@ public class MemberService{
 	}
 	
 	//비밀번호 변경 서비스
+	@Transactional
 	public void updatePassword(Long userId, String currentPassword, String newPassword) {
 		Member member = memberRepository.findById(userId)
 				.orElseThrow(()-> new LoginFailedException("회원 정보를 찾을 수 없습니다."));
@@ -153,6 +156,10 @@ public class MemberService{
 			
 		}
 		
+		if(currentPassword.equals(newPassword)) {
+			throw new LoginFailedException("새 비밀번호는 현재 비밀번호와 다르게 설정해야합니다.");
+		}
+		
 		// 새 비밀번호 인코딩, 저장
 		member.updatePassword(passwordEncoder.encode(newPassword));
 		memberRepository.save(member);
@@ -160,6 +167,18 @@ public class MemberService{
 		
 	}
 	
+	//회원 탈퇴
+	@Transactional
+	public void deleteUser(Long userId) {
+		
+		// 사용자가 존재하는지 확인
+		Member member = memberRepository.findById(userId)
+				.orElseThrow(()-> new LoginFailedException("회원 정보를 찾을 수 없습니다."));
+		// 사용자 삭제
+		memberRepository.delete(member);
+		
+		
+	}
 	
 	
 	

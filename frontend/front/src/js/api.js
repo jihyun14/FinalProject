@@ -92,11 +92,12 @@ async function updatePassword(userId, currentPassword, newPassword) {
   return response.ok;
 }
 
-/**
- * (D) 회원 탈퇴 (백엔드에 아직 구현 안 됨)
- 
-async function deleteAccount(userId) { // 👈 [수정] userId 인자 추가
-  const response = await fetch(`${API_BASE_URL}/user/${userId}`, { // 👈 (가정)
+/* (D) 회원 탈퇴 (백엔드에 아직 구현 안 됨)*/
+
+async function deleteUser(userId) {
+  // 👈 [수정] userId 인자 추가
+  const response = await fetch(`${API_BASE_URL}/user/${userId}`, {
+    // 👈 (가정)
     method: "DELETE",
   });
   if (!response.ok) {
@@ -104,7 +105,6 @@ async function deleteAccount(userId) { // 👈 [수정] userId 인자 추가
   }
   return response.ok;
 }
-*/
 
 /**
  * (C) 새 세션 생성

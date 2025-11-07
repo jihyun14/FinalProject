@@ -86,7 +86,7 @@ function initMypageListeners() {
           if (newNick) {
             try {
               // ⚠️ [테스트용] ID를 하드코딩합니다 (예: 1번 사용자)
-              const currentUserId = 1;
+              const currentUserId = 3;
 
               // 1. [수정] api.js 함수 호출
               await updateNickname(currentUserId, newNick);
@@ -122,7 +122,8 @@ function initMypageListeners() {
             <input type="password" id="confirmPassword" name="confirmPassword" class="input">
           </div>
         `,
-        onConfirm: (data) => {
+        // action === "open-security"의 onConfirm 콜백
+        onConfirm: async (data) => {
           const { currentPassword, newPassword, confirmPassword } = data;
 
           if (!currentPassword || !newPassword || !confirmPassword) {
@@ -135,10 +136,28 @@ function initMypageListeners() {
             return false;
           }
 
+          // ‼️ [핵심] 이 검사 로직이 빠졌습니다. ‼️
+          if (currentPassword === newPassword) {
+            showToast("새 비밀번호가 현재 비밀번호와 동일합니다.", "error");
+            return false; // 👈 여기서 막아야 합니다.
+          }
+
+          try {
+            // 1번 사용자로 하드코딩
+            const currentUserId = 3;
+            await updatePassword(currentUserId, currentPassword, newPassword);
+
+            showToast("비밀번호 변경 완료", "success");
+          } catch (error) {
+            showToast("비밀번호 변경 실패 (현재 비밀번호 확인)", "error");
+            return false;
+          }
+        },
+        /*
           // --- (경고) 실제 서버 API 호출 필요 ---
           console.log("서버 전송 시도:", data);
           showToast("비밀번호 변경 완료", "success");
-        },
+          */
       });
     } else if (action === "open-report") {
       if (typeof openDocModal === "function") {
@@ -221,14 +240,21 @@ function initMypageListeners() {
         message:
           "정말로 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없으며 모든 데이터가 영구적으로 삭제됩니다.",
         okText: "탈퇴", // 버튼 텍스트
-        onConfirm: () => {
-          // (데모) 토스트 메시지만 표시
-          showToast("회원 탈퇴가 처리되었습니다.", "info");
+        onConfirm: async () => {
+          try {
+            const currentUserId = 3; // ⚠️ [테스트용] 하드코딩
 
-          // (예시) 1초 후 페이지 새로고침 (로그아웃 효과)
-          setTimeout(() => {
-            location.reload();
-          }, 1000);
+            await deleteUser(currentUserId);
+            showToast("회원 탈퇴가 완료되었습니다.", "info");
+
+            localStorage.removeItem(NICK_KEY);
+
+            setTimeout(() => {
+              location.reload();
+            }, 1000);
+          } catch (error) {
+            showToast("회원 탈퇴 실패", "error");
+          }
         },
       });
     } else if (action === "open-emergency") {
