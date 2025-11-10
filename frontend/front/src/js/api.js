@@ -33,9 +33,23 @@ async function saveMessage(sessionId, messageData) {
  * (U) 닉네임 변경
  * @param {string} newNickname
  */
+/*
 async function updateNickname(newNickname) {
   const response = await fetch(`${API_BASE_URL}/user/nickname`, {
     method: "PUT", // 또는 'PATCH'
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nickname: newNickname }),
+  });
+  if (!response.ok) {
+    throw new Error("닉네임 변경 실패");
+  }
+  return response.ok; // 성공 여부
+}
+*/
+/*닉네임 변경*/
+async function updateNickname(userId, newNickname) {
+  const response = await fetch(`${API_BASE_URL}/user/${userId}/nickname`, {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ nickname: newNickname }),
   });
@@ -50,7 +64,7 @@ async function updateNickname(newNickname) {
  * @param {string} currentPassword
  * @param {string} newPassword
  */
-async function updatePassword(currentPassword, newPassword) {
+/*async function updatePassword(currentPassword, newPassword) {
   const response = await fetch(`${API_BASE_URL}/user/password`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -60,6 +74,34 @@ async function updatePassword(currentPassword, newPassword) {
   if (!response.ok) {
     // 401: 현재 비밀번호 불일치, 400: 유효성 검사 실패 등
     throw new Error("비밀번호 변경 실패");
+  }
+  return response.ok;
+}
+*/
+
+/*비밀번호 변경*/
+async function updatePassword(userId, currentPassword, newPassword) {
+  const response = await fetch(`${API_BASE_URL}/user/${userId}/password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!response.ok) {
+    throw new Error("비밀번호 변경 실패");
+  }
+  return response.ok;
+}
+
+/* (D) 회원 탈퇴 (백엔드에 아직 구현 안 됨)*/
+
+async function deleteUser(userId) {
+  // 👈 [수정] userId 인자 추가
+  const response = await fetch(`${API_BASE_URL}/user/${userId}`, {
+    // 👈 (가정)
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error("회원 탈퇴 실패");
   }
   return response.ok;
 }

@@ -7,18 +7,27 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.prinCipal.chatbot.exception.LoginFailedException;
+import com.prinCipal.chatbot.exception.SignupValidationException;
 import com.prinCipal.chatbot.oauth2.CustomOAuth2User;
 import com.prinCipal.chatbot.security.JwtTokenProvider;
 
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,9 +101,83 @@ public class MemberApiController {
         return response;
     }
 	
+	//닉네임변경 api
+	@PutMapping("/user/{userId}/nickname")
+	public ResponseEntity<?> updateNickname(
+			@PathVariable("userId") Long userId,
+			@RequestBody NicknameUpdateRequest request){
+		
+		try {
+			   memberService.updateNickname(userId, request.getNickname());
+			   return ResponseEntity.ok(Map.of("status","success","message","닉네임 변경 완료"));
+		} catch (SignupValidationException e) {//닉네임 중복 예외 처리
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+					.body(Map.of("status","error","message",e.getErrors()));
+		} catch(LoginFailedException e){
+			return ResponseEntity.status(HttpStatus.NOT_FOUND)
+					.body(Map.of("status","error","message",e.getMessage()));
+		}
+		
+	}
+	
+	// 비밀번호 변경 api 
+	@PutMapping("/user/{userId}/password")
+	public ResponseEntity<?> updatePassword(
+			@PathVariable("userId") Long userId,
+			@RequestBody PasswordUpdateRequest request){
+		
+		try {
+			memberService.updatePassword(
+					userId,
+					request.getCurrentPassword(),
+					request.getNewPassword()
+					);
+			
+			return ResponseEntity.ok(Map.of("status","success","message","비밀번호 변경 완료"));
+			
+		} catch (LoginFailedException e) {
+			// 현재 비밀번호가 틀린 경우
+			 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+					 .body(Map.of("status","error","message", e.getMessage()));
+		}		
+		
+	}
+	
+	@DeleteMapping("/user/{userId}")
+	public ResponseEntity<?> deleteUser(
+			@PathVariable("userId") Long userId){
+		
+		try {
+			memberService.deleteUser(userId);
+			return ResponseEntity.ok(Map.of("status","success","message","회원 탈퇴 완료"));
+			
+		} catch (LoginFailedException e) {
+			// 사용자를 찾지 못한 경우
+			return ResponseEntity.status(HttpStatus.NOT_FOUND)
+					.body(Map.of("status","error","message",e.getMessage()));
+		}
+		
+		
+	}
+	
 	
 	
 
+	@Getter
+	@Setter
+	@NoArgsConstructor
+	static class NicknameUpdateRequest{
+		private String nickname;
+	}
+	
+	@Getter
+	@Setter
+	@NoArgsConstructor
+	static class PasswordUpdateRequest{
+		private String currentPassword;
+		private String newPassword;
+		
+	}
 	
 	
 	

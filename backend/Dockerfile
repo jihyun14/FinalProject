@@ -8,6 +8,8 @@ COPY build.gradle settings.gradle gradlew ./
 COPY gradle gradle
 RUN ./gradlew dependencies --no-daemon
 
+COPY src src
+
 EXPOSE 8080
 EXPOSE 35729
 

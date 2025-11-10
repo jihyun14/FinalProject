@@ -97,8 +97,25 @@ public class Member {
     }
 
 
+    // 닉네임 변경 메소드
+    public void updateNickname(String newNickname) {
+    	if(newNickname != null&& !newNickname.isBlank()) {
+    		this.nickname = newNickname;
+    		this.updatedAt = LocalDateTime.now();
+    		
+    	}
+    }
 
-
+    //추가 비밀번호 변경 메소드(서비스에서 인코딩된 비밀번호 받아옴)
+    public void updatePassword(String newPassword) {
+    	this.password = newPassword;
+    	this.updatedAt = LocalDateTime.now();
+    	
+    	
+    }
+    
+    
+    
 	
 	
 }
