@@ -6,11 +6,9 @@ WORKDIR /app
 # Gradle wrapper와 dependencies 캐시
 COPY build.gradle settings.gradle gradlew ./
 COPY gradle gradle
-RUN ./gradlew dependencies --no-daemon
-
 COPY src src
+RUN ./gradlew dependencies --no-daemon
 
 EXPOSE 8080
 EXPOSE 35729
-
 CMD ["./gradlew", "bootRun", "--no-daemon"]

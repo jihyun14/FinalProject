@@ -21,10 +21,7 @@ export default defineConfig({
         target: "http://backend:8080", // 같은 네트워크에 있는 다른 컨테이너로 요청이라서 서비스 이름으로 해도 통하는 거임
         changeOrigin: true,
       },
-      "/api": {
-        target: "http://finalproject-backend:8080", //  브라우저에서 프론트엔드 컨테이너에서, 백엔드 컨테이너로 쏘는 거임 (도커 네트워크 기중)
-        changeOrigin: true,
-      },
+      "/api": { target: "http://backend:8080" },
     },
     strictPort: true,
     watch: {

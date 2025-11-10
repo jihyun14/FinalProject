@@ -66,42 +66,29 @@ function initMypageListeners() {
               value="" placeholder="${currentNick}">
           </div>
         `,
-        /*onConfirm: (data) => {
-          const newNick = (data.nickname || "").trim();
-          if (newNick) {
-            localStorage.setItem(NICK_KEY, newNick);
-            if (typeof updateNicknameDisplay === "function") {
-              updateNicknameDisplay(); // 헤더, 마이페이지, 빈 채팅방 닉네임 동시 업데이트
-            }
-            showToast("닉네임 저장 완료", "success");
-          } else {
-            showToast("닉네임을 입력해주세요.", "error");
-            return false;
-          }
-        },*/
-        // mypage.js의 'open-profile' (닉네임 변경) onConfirm 부분
-
         onConfirm: async (data) => {
           const newNick = (data.nickname || "").trim();
           if (newNick) {
             try {
-              // ⚠️ [테스트용] ID를 하드코딩합니다 (예: 1번 사용자)
-              const currentUserId = 3;
+              // [변경] localStorage -> API 호출
+              await updateNickname(newNick);
 
-              // 1. [수정] api.js 함수 호출
-              await updateNickname(currentUserId, newNick);
-
+              // [유지] API 성공 시 로컬에도 반영 (선택적)
               localStorage.setItem(NICK_KEY, newNick);
+
               if (typeof updateNicknameDisplay === "function") {
                 updateNicknameDisplay();
               }
               showToast("닉네임 저장 완료", "success");
-            } catch (error) {
-              showToast("닉네임 변경 실패", "error");
-              return false;
+            } catch (err) {
+              console.error(err);
+              showToast("닉네임 변경 실패 (서버 오류)", "error");
+              return false; // 오류 시 모달 닫지 않음
             }
+          } else {
+            showToast("닉네임을 입력해주세요.", "error");
+            return false;
           }
-          // ... (이하 생략)
         },
       });
     } else if (action === "open-security") {
@@ -122,7 +109,6 @@ function initMypageListeners() {
             <input type="password" id="confirmPassword" name="confirmPassword" class="input">
           </div>
         `,
-        // action === "open-security"의 onConfirm 콜백
         onConfirm: async (data) => {
           const { currentPassword, newPassword, confirmPassword } = data;
 
@@ -136,28 +122,18 @@ function initMypageListeners() {
             return false;
           }
 
-          // ‼️ [핵심] 이 검사 로직이 빠졌습니다. ‼️
-          if (currentPassword === newPassword) {
-            showToast("새 비밀번호가 현재 비밀번호와 동일합니다.", "error");
-            return false; // 👈 여기서 막아야 합니다.
-          }
-
+          // --- 실제 서버 API 호출 ---
           try {
-            // 1번 사용자로 하드코딩
-            const currentUserId = 3;
-            await updatePassword(currentUserId, currentPassword, newPassword);
+            // api.js에 updatePassword 함수가 있다고 전제
+            await updatePassword(currentPassword, newPassword);
 
             showToast("비밀번호 변경 완료", "success");
-          } catch (error) {
-            showToast("비밀번호 변경 실패 (현재 비밀번호 확인)", "error");
+          } catch (err) {
+            console.error("비밀번호 변경 실패:", err);
+            showToast("현재 비밀번호가 일치하지 않습니다.", "error");
             return false;
           }
         },
-        /*
-          // --- (경고) 실제 서버 API 호출 필요 ---
-          console.log("서버 전송 시도:", data);
-          showToast("비밀번호 변경 완료", "success");
-          */
       });
     } else if (action === "open-report") {
       if (typeof openDocModal === "function") {
@@ -204,18 +180,24 @@ function initMypageListeners() {
       Modal.open({
         message: "⚠ 삭제 시 되돌릴 수 없습니다. 전체 삭제할까요?",
         okText: "삭제",
-        onConfirm: () => {
-          // 1. 로컬 스토리지 삭제
-          localStorage.removeItem(STORE_KEY);
+        // onConfirm을 async 함수로 변경
+        onConfirm: async () => {
+          try {
+            // 1. 서버에 전체 삭제 요청 (api.js 함수 호출)
+            await clearAllSessions();
 
-          // 2. 메모리에 있는 전역 state 변수 초기화
-          Object.assign(state, createEmptyStore());
+            // 2. (API 성공 시) 로컬 state 초기화
+            Object.assign(state, createEmptyStore());
 
-          // 3. 새 채팅 세션 생성
-          createNewSession();
+            // 3. 서버에 새 채팅 세션 생성 요청
+            await createNewSession(); // (내부적으로 renderChat() 호출됨)
 
-          // 4. 토스트 표시 (새로고침 제거)
-          showToast("대화 전체 비우기 완료", "success");
+            // 4. 토스트 표시
+            showToast("대화 전체 비우기 완료", "success");
+          } catch (err) {
+            console.error("대화 전체 삭제 실패:", err);
+            showToast("대화 삭제에 실패했습니다.", "error");
+          }
         },
       });
     } else if (action === "wipe-local") {
@@ -240,21 +222,14 @@ function initMypageListeners() {
         message:
           "정말로 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없으며 모든 데이터가 영구적으로 삭제됩니다.",
         okText: "탈퇴", // 버튼 텍스트
-        onConfirm: async () => {
-          try {
-            const currentUserId = 3; // ⚠️ [테스트용] 하드코딩
+        onConfirm: () => {
+          // (데모) 토스트 메시지만 표시
+          showToast("회원 탈퇴가 처리되었습니다.", "info");
 
-            await deleteUser(currentUserId);
-            showToast("회원 탈퇴가 완료되었습니다.", "info");
-
-            localStorage.removeItem(NICK_KEY);
-
-            setTimeout(() => {
-              location.reload();
-            }, 1000);
-          } catch (error) {
-            showToast("회원 탈퇴 실패", "error");
-          }
+          // (예시) 1초 후 페이지 새로고침 (로그아웃 효과)
+          setTimeout(() => {
+            location.reload();
+          }, 1000);
         },
       });
     } else if (action === "open-emergency") {

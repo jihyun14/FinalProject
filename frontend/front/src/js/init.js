@@ -168,10 +168,13 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("탐색에 필요한 주요 DOM 요소가 없습니다.");
   } else {
     // 1. '새 채팅' 버튼
-    qs("#newChatBtn").addEventListener("click", () => {
+    qs("#newChatBtn").addEventListener("click", async () => {
+      // async 추가
       archiveCurrent();
-      createNewSession();
-      showPage(chatArea);
+      const success = await createNewSession();
+      if (success) {
+        showPage(chatArea);
+      }
     });
 
     // 2. '마이페이지' 버튼
@@ -216,8 +219,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!state.currentId) createNewSession();
   qs("#chatForm").addEventListener("submit", handleSend);
 
-  // 기존 채팅 렌더링
-  renderChat();
+  // 비동기 로드 함수 호출
+  loadInitialData();
 
   // STT 바인딩: 채팅 화면 마이크
   const chatMicBtn = document.getElementById("micBtn");

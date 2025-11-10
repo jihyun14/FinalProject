@@ -1,5 +1,8 @@
 package com.prinCipal.chatbot.security;
 
+import org.springframework.web.cors.CorsConfiguration;
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -31,18 +34,26 @@ public class SecurityConfig {
 	private final CutomOAuth2UserService customOAuth2UserService;
     private final PasswordEncoder passwordEncoder;
 
-    private static final String[] PERMIT_URL = {
-    		"/api/login", "/api/signup", "/api/refresh",  "/api/logout",
-		    "/oauth2/**",     // 소셜 로그인
-		    "/login/oauth2/code/**",  
-		    "/css/**", "/js/**", "/images/**", "/favicon.ico" // 정적 파일
-		};
+//    private static final String[] PERMIT_URL = {
+//    		"/api/login", "/api/signup", "/api/refresh",  "/api/logout",
+//		    "/oauth2/**",     // 소셜 로그인
+//		    "/login/oauth2/code/**",  
+//		    "/css/**", "/js/**", "/images/**", "/favicon.ico" // 정적 파일
+//		};
     
  
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter, CustomAuthenticationFilter customLoginFilter) throws Exception{
-		String[] cookiesToClear = {"JSESSIONID", "refreshToken"};
+//		String[] cookiesToClear = {"JSESSIONID", "refreshToken"};
 		return http
+				.cors(cors -> cors.configurationSource(request -> {
+					CorsConfiguration config = new CorsConfiguration();
+					config.setAllowedOrigins(List.of("http://localhost:3000")); // 
+					config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+					config.setAllowedHeaders(List.of("*"));
+					config.setAllowCredentials(true);
+					return config;
+				}))
 				.csrf((csrf) -> csrf.disable())
 				.httpBasic(httpBasic -> httpBasic.disable()) // HTTP Basic 인증 비활성화
 	            .formLogin(formLogin -> formLogin.disable()) // Form Login 비활성화
@@ -56,10 +67,10 @@ public class SecurityConfig {
 				)
 				.logout(logout -> logout.disable())
 				.authorizeHttpRequests((authorizeHttpRequests) -> authorizeHttpRequests
-						.requestMatchers(PERMIT_URL).permitAll()
-						.requestMatchers("/auth/**").authenticated() //인증 필요
-						//.anyRequest().authenticated()
-						.anyRequest().permitAll() //테스트용(모두허용)
+//						.requestMatchers(PERMIT_URL).permitAll()
+//						.requestMatchers("/auth/**").authenticated() //인증 필요
+						// .anyRequest().authenticated()
+						.anyRequest().permitAll()
 				)
 				.authenticationProvider(authenticationProvider())
 				// API 요청이 들어올 때마다 JWT 토큰을 검증할 커스텀 필터 => JwtAuthenticationFilter
