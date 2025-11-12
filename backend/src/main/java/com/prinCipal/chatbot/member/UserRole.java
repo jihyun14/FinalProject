@@ -8,10 +8,9 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum UserRole implements GrantedAuthority{
-	USER("고객", "ROLE_USER"),
-	ADMIN("관리자", "ROLE_ADMIN");
-	
-	private final String displayName;
+	USER("ROLE_USER"),
+	ADMIN("ROLE_ADMIN");
+
 	private final String authority;
 	
 	@Override
