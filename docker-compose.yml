@@ -46,7 +46,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 10
-      start_period: 90s
+      start_period: 360s
 
     env_file:
       - .env
@@ -111,20 +111,17 @@ services:
       - "--default-authentication-plugin=caching_sha2_password"
       - "--host-cache-size=0"
       - "--pid-file=/var/lib/mysql/mysqld.pid"
+      - "--bind-address=0.0.0.0"
     healthcheck:
       test:
         [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-uroot",
-          "-p${DB_PASSWORD}",
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -uroot -p${DB_PASSWORD} || exit 1",
         ]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 360s
 
   redis:
     image: redis:7
