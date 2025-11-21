@@ -36,16 +36,7 @@ CREATE TABLE counselling_session (
     last_message_time DATETIME DEFAULT NULL,  			-- 마지막 메세지 시간
     
     warning_sent BOOLEAN DEFAULT FALSE,					-- 5분 경고 확인
-    -- 세션 길이 (챗봇 메시지 시각 → 타임아웃 판단 가능)
-    duration_sec INT GENERATED ALWAYS AS (
-        CASE
-            WHEN end_time IS NOT NULL   
-                THEN TIMESTAMPDIFF(SECOND, start_time, end_time)
-            ELSE NULL
-        END
-    ) STORED,
-
-
+    duration_sec INT GENERATED ALWAYS AS (TIMESTAMPDIFF(SECOND, start_time, end_time)) STORED, 	-- 총 상담 시간
     completion_status ENUM('ONGOING', 'COMPLETED', 'TIMEOUT') DEFAULT 'ONGOING' NOT NULL, 		-- 상담 진행 상태 (시작, 종료, 타임아웃)
 
     summary_title TEXT DEFAULT NULL,					-- 상담 제목 (첫발화로 ai가 상담 제목 작성)
@@ -125,14 +116,14 @@ CREATE TABLE lawyers(
     name VARCHAR(50) NOT NULL,                          -- 변호사 이름
     gender VARCHAR(10) DEFAULT NULL,                    -- 성별 (M/F/기타 문자열)
 
-    detailSpecialty VARCHAR(200) DEFAULT NULL,          -- 세부 전문 분야
+    detail_specialty VARCHAR(200) DEFAULT NULL,          -- 세부 전문 분야
     description VARCHAR(1000) DEFAULT NULL,             -- 소개/설명
 
     contact VARCHAR(50) DEFAULT NULL,                   -- 연락처
     office VARCHAR(100) DEFAULT NULL,                   -- 소속 로펌/사무실명
-    officeLocation VARCHAR(100) DEFAULT NULL,           -- 사무실 위치
+    office_location VARCHAR(100) DEFAULT NULL,           -- 사무실 위치
 
-    imageUrl VARCHAR(255) DEFAULT NULL                 -- 프로필 이미지 URL
+    image_url VARCHAR(255) DEFAULT NULL                 -- 프로필 이미지 URL
 );
 
 
