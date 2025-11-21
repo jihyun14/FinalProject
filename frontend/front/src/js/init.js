@@ -248,7 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     // 1. '새 채팅' 버튼
     qs("#newChatBtn").addEventListener("click", () => {
-      archiveCurrent();
+      // archiveCurrent();
 
       state.currentId = null; // 1. 현재 ID를 null로 설정
       renderChat(); // 2. 빈 채팅 화면을 그림 (DB 호출 없음)
