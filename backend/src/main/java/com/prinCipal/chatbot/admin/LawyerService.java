@@ -88,4 +88,6 @@ public class LawyerService {
 			throw new RuntimeException("파일 업로드 실패", e);
 		}
 	}
+
+	
 }

@@ -39,7 +39,7 @@ services:
       REDIS_PORT: ${REDIS_PORT}
       SPRING_DEVTOOLS_RESTART_ENABLED: "true"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "true"
-    command: ./gradlew bootRun --continuous --no-daemon 
+    command: ./gradlew bootRun --continuous --no-daemon
 
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
@@ -101,7 +101,7 @@ services:
       interval: 60s
       timeout: 5s
       retries: 3
-      start_period : 5s
+      start_period: 5s
 
   mysql:
     image: mysql:8.0
@@ -135,6 +135,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 60s
 
   redis:
     image: redis:7

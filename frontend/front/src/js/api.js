@@ -119,6 +119,23 @@ export async function createSession(userId) {
 }
 
 /**
+ * (R) 변호사/상담사 전체 목록 조회
+ * GET /api/lawyers
+ */
+export async function getLawyerList() {
+  // 백엔드 컨트롤러에 @GetMapping("/api/lawyers")가 구현되어 있어야 합니다.
+  const response = await fetch(`${API_BASE_URL}/lawyers`, {
+    method: "GET",
+    headers: getAuthHeaders(false), // 인증 토큰 포함 (필요 없다면 headers 제거 가능)
+  });
+
+  if (!response.ok) {
+    throw new Error("변호사 목록을 불러오는데 실패했습니다.");
+  }
+  return response.json(); // DB의 lawyers 테이블 데이터 배열 반환
+}
+
+/**
  * (D) 모든 대화 삭제
  */
 export async function clearAllSessions() {

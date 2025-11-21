@@ -2,6 +2,8 @@
 // 8. 메인 초기화
 // (DOM 로드 후 이벤트 바인딩 및 앱 실행)
 // ===================================
+// 1. [필수] 가장 먼저 실행 (API 요청 시 토큰 자동 포함)
+import "./tokenApi.js";
 
 import {
   Modal,
@@ -17,11 +19,21 @@ import {
   loadInitialData,
 } from "./utils.js";
 
-import { archiveCurrent, handleSend, renderChat } from "./chat.js";
+// 2. [수정됨] createNewSession 추가 (새 채팅 버튼 기능 연결용)
+import {
+  archiveCurrent,
+  handleSend,
+  renderChat,
+  createNewSession,
+} from "./chat.js";
 
 import { initMypageListeners } from "./mypage.js";
 import { bindMic } from "./stt.js";
-import { render, initLawyerPageListeners } from "./lawyer.js";
+
+// 3. [수정됨] 변호사 페이지 초기화 함수만 가져오면 충분합니다.
+import { initLawyerPageListeners } from "./lawyer.js";
+
+// ... (이 아래부터 기존 코드 유지) ...
 
 // 페이지 전환 함수
 let isLawyerPageInitialized = false;
@@ -29,7 +41,6 @@ let isLawyerPageInitialized = false;
 if (!document.getElementById("chatArea")) {
   window.INIT_STOP = true;
 }
-
 
 // showPage 함수를 동기식으로 변경
 export function showPage(pageToShow) {
@@ -135,7 +146,7 @@ export function openDocModal(title, content, size = "lg") {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-   if (window.INIT_STOP) return;     // index.html에서는 전체 init 로직을 실행하지 않음
+  if (window.INIT_STOP) return; // index.html에서는 전체 init 로직을 실행하지 않음
   Modal.init();
   FormModal.init();
 
