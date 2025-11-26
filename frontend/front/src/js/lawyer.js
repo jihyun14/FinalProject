@@ -13,11 +13,7 @@ function classifyRegion(address) {
   if (!address) return "기타";
   const addr = address.trim();
 
-  if (
-    addr.includes("서울") ||
-    addr.includes("경기") ||
-    addr.includes("인천")
-  )
+  if (addr.includes("서울") || addr.includes("경기") || addr.includes("인천"))
     return "서울·수도권";
   if (
     addr.includes("부산") ||
@@ -164,9 +160,7 @@ function card(item) {
 
   const aCall = document.createElement("a");
   aCall.className = "btn small line";
-  aCall.href = item.phone
-    ? `tel:${item.phone.replaceAll(/[^0-9]/g, "")}`
-    : "#";
+  aCall.href = item.phone ? `tel:${item.phone.replaceAll(/[^0-9]/g, "")}` : "#";
   aCall.textContent = "전화";
 
   const aMap = document.createElement("a");
