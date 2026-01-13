@@ -2,6 +2,10 @@ package com.prinCipal.chatbot.counsel;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prinCipal.chatbot.ChatService;
+import com.prinCipal.chatbot.alert.AlertSeverity;
+import com.prinCipal.chatbot.alert.AlertStatus;
+import com.prinCipal.chatbot.alert.CrisisAlert;
+import com.prinCipal.chatbot.alert.CrisisAlertRepository;
 import com.prinCipal.chatbot.content.*;
 import com.prinCipal.chatbot.dto.*;
 import com.prinCipal.chatbot.member.Member;
@@ -11,11 +15,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.data.redis.core.StringRedisTemplate; // 변경됨
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.prinCipal.chatbot.admin.CounselLogDto;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -24,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
 
 @Service
 @RequiredArgsConstructor
@@ -35,11 +37,9 @@ public class SessionService {
 	private final KeywordRepository keywordAnalysisRepository;
 	private final ChatService chatService;
 	private final ObjectMapper objectMapper;
+	private final CrisisAlertRepository crisisAlertRepository;
 
-	// RedisConfig에 등록된 빈 이름과 타입 매칭
-	private final StringRedisTemplate stringRedisTemplate;
-
-	// 비동기 처리를 위한 자기 자신 주입 (순환 참조 방지 @Lazy)
+	// [핵심] 비동기 처리를 위한 자기 자신 주입 (순환 참조 방지 @Lazy)
 	@Lazy
 	@Autowired
 	private SessionService self;
@@ -53,7 +53,7 @@ public class SessionService {
 	@Transactional // 새 세션 생성은 하나의 트랜잭션으로 관리
 	public CounsellingSession createSession(Member member) {
 		CounsellingSession session = CounsellingSession.builder().member(member)
-				.completionStatus(CompletionStatus.ONGOING).resumeToken(null).build();
+				.completionStatus(CompletionStatus.ONGOING).build();
 
 		// 초기 제목 및 시간 설정 (DB 기본값 대신)
 		session.updateSummaryTitle("새 대화");
@@ -122,6 +122,7 @@ public class SessionService {
 					Map<String, Object> sessionDetail = new HashMap<>();
 					sessionDetail.put("id", session.getSessionId());
 					sessionDetail.put("title", session.getSummaryTitle());
+					sessionDetail.put("summary", session.getSummary());
 
 					List<Map<String, Object>> messages = session.getContents().stream()
 							// [수정 전] 시간만 보고 정렬 (시간 같으면 순서 엉망됨)
@@ -156,51 +157,54 @@ public class SessionService {
 		return initialData;
 	}
 	
-	
-     // 1. 채팅 처리 메인 로직
-     // 흐름: Redis 조회 -> (없으면 AI 호출) -> 비동기 저장 실행 -> 사용자에게 즉시 응답
+	// 1. 일반 채팅 처리 (processChat)
     public ChatResponseDto processChat(ChatRequestDto requestDto, Member member) {
-        String userQuery = requestDto.getUserMessage();
-        // Redis Key: 사용자 질문 내용을 기반으로 생성 (중복 질문 식별)
-        String redisKey = "chat:response:" + userQuery.trim(); 
+        
+        // [STEP 0] DB에서 세션 정보를 먼저 조회 (요약본 가져오기 위해)
+        // 기존에는 비동기 저장할 때만 조회했지만, 이제는 요청 보낼 때 필요하므로 여기서 조회
+        CounsellingSession session = sessionRepository.findBySessionIdAndMember(requestDto.getSessionId(), member)
+                .orElseThrow(() -> new RuntimeException("세션을 찾을 수 없습니다."));
 
-        FastApiResponseDto responseData = null;
+        // =================================================================================
+        // [✅ STEP 0.5 - 추가] 변호사 추천 카드 데이터라면? -> AI 호출 없이 저장만 하고 끝낸다!
+        // =================================================================================
+        if (requestDto.getUserMessage() != null && requestDto.getUserMessage().trim().startsWith(":::LAWYER_RECOMMENDATION:::")) {
+            
+            // 1. DB에 '봇(CHATBOT)'이 말한 것으로 저장
+            // (경고 메시지 저장하는 방식과 동일합니다)
+            CounsellingContent lawyerCardMsg = CounsellingContent.builder()
+                    .session(session)
+                    .sender(Sender.CHATBOT) // 👈 중요: 봇이 말한 것으로 저장
+                    .content(requestDto.getUserMessage())
+                    .build();
+            contentRepository.save(lawyerCardMsg);
 
-        // [STEP 1] Redis 캐시 조회
-        try {
-            ValueOperations<String, String> ops = stringRedisTemplate.opsForValue();
-            String cachedJson = ops.get(redisKey);
+            // 2. 세션의 마지막 대화 시간 업데이트 (채팅방 정렬 순서 유지용)
+            session.updateLastMessageTime(LocalDateTime.now());
+            sessionRepository.save(session);
 
-            if (cachedJson != null) {
-                // 캐시 히트! (AI 서버 호출 없이 바로 응답)
-                responseData = objectMapper.readValue(cachedJson, FastApiResponseDto.class);
-                logger.info("🚀 Redis Cache Hit! (Query: {})", userQuery);
-            }
-        } catch (Exception e) {
-            logger.warn("Redis 조회 중 오류 (무시하고 AI 호출 진행): {}", e.getMessage());
+            // 3. 여기서 함수 강제 종료! (아래의 AI 호출 코드가 실행되지 않음)
+            // 프론트엔드는 이미 카드를 그렸으므로, 리턴값은 크게 중요하지 않음
+            return new ChatResponseDto(
+                    "LAWYER_CARD_SAVED", 
+                    requestDto.getSessionId().toString(), 
+                    session.getSummaryTitle()
+            );
         }
+        // =================================================================================
+        
+        // [STEP 1] 이전 요약본(prevSummary) 추출
+        String prevSummary = session.getSummary(); // DB에 저장된 요약본
 
-        // [STEP 2] 캐시가 없으면 FastAPI 호출 (AI 추론)
-        if (responseData == null) {
-            try {
-                responseData = chatService.getFastApiResponse(requestDto);
-                
-                // 다음을 위해 Redis에 저장 (TTL 설정)
-                String jsonToCache = objectMapper.writeValueAsString(responseData);
-                stringRedisTemplate.opsForValue().set(redisKey, jsonToCache, CACHE_TTL);
-                
-            } catch (Exception e) {
-                logger.error("FastAPI 호출 실패: {}", e.getMessage());
-                // 봇이 죽었을 때 예외 처리 (사용자에게 에러 메시지 반환 등)
-                throw new RuntimeException("AI 서버 응답 실패");
-            }
-        }
+        // [STEP 2] FastAPI 호출 (요약본을 같이 넘김)
+        FastApiResponseDto responseData = chatService.getFastApiResponse(requestDto, prevSummary); // 👈 전달
 
-        // [STEP 3] DB 저장은 '비동기'로 던져두기
-        // 여기서 self.save...를 호출하면 별도 스레드가 돌기 때문에, 아래 return이 즉시 실행됨
+        // [STEP 3] 비동기 저장 호출
+        // (주의: 이미 위에서 session을 조회했으므로, saveChatHistoryAsync를 조금 수정해서 session 객체를 넘기거나
+        //  그대로 둬서 다시 조회하게 해도 됩니다. 성능상 큰 차이는 없으니 기존 유지도 무방)
         self.saveChatHistoryAsync(requestDto, responseData, member);
 
-        // [STEP 4] 사용자에게 즉시 응답 반환
+        // [STEP 4] 응답 반환
         String newTitle = null;
         if (responseData.getSessionUpdates() != null) {
             newTitle = responseData.getSessionUpdates().getSummaryTitle();
@@ -213,9 +217,42 @@ public class SessionService {
         );
     }
 
-    
-     // 2. 비동기 DB 저장 메서드 (@Async)
-     // 사용자가 응답을 받은 뒤 백그라운드에서 실행됨
+    // 2. 상담 종료 처리 (endSessionManually) -> 여기서 endTime 처리!
+    @Transactional
+    public void endSessionManually(Long sessionId, Member member) {
+        CounsellingSession session = sessionRepository.findBySessionIdAndMember(sessionId, member)
+                .orElseThrow(() -> new RuntimeException("세션이 없거나 권한이 없습니다."));
+
+        if (session.getCompletionStatus() != CompletionStatus.ONGOING) {
+            return;
+        }
+
+        // [핵심] 종료 시점에 FastAPI에게 "최종 리포트" 요청
+        String finalReport = chatService.getFinalReport(
+            sessionId.toString(), 
+            session.getSummary() // 현재까지의 요약본 전달
+        );
+        
+        // 받아온 최종 리포트로 DB 업데이트
+        if (finalReport != null && !finalReport.isEmpty()) {
+            session.updateSummary(finalReport);
+        }
+
+        // 상태 변경 및 endTime 기록
+        session.updateStatus(CompletionStatus.COMPLETED);
+        session.updateendTime(LocalDateTime.now()); // 👈 endTime은 여기서!
+        
+        saveSystemMessage(session,
+                            "상담이 종료되었습니다.\n" +
+                            "마이페이지에서 상담 요약을 확인하실 수 있습니다.\n" +
+                            "계속 상담을 원하시면 “상담 재시작” 버튼을 눌러주세요."
+                        );
+    }
+
+    /**
+     * 2. 비동기 DB 저장 메서드 (@Async)
+     * 사용자가 응답을 받은 뒤 백그라운드에서 실행됨
+     */
     @Async // 별도 스레드에서 실행됨
     @Transactional
     @CacheEvict(value = "initialData", key = "#member.userId") 
@@ -245,7 +282,13 @@ public class SessionService {
 
             // 4. 분석 데이터 저장
             KeywordAnalysisDto analysisDto = fastApiResponse.getKeywordAnalysis();
+            
             if (analysisDto != null) {
+            	
+            	// 1. Python에서 보낸 등급 문자열 가져오기 ("DANGER", "HIGH", "MEDIUM" or null)
+                String severityStr = analysisDto.getAlertSeverity();
+                boolean isDanger = (severityStr != null && !severityStr.isEmpty());
+            	
                 KeywordAnalysis analysis = KeywordAnalysis.builder()
                         .session(session)
                         .content(userMessage)
@@ -255,9 +298,35 @@ public class SessionService {
                         .intent(analysisDto.getIntent())
                         .situation(analysisDto.getSituation())
                         .retrievedData(convertMapToJsonString(analysisDto.getRetrievedData()))
-                        .alertTriggered(false)
+                        .alertTriggered(isDanger)
                         .build();
                 keywordAnalysisRepository.save(analysis);
+                
+                // [4-2] 위기 상황(isDanger)이라면 CrisisAlert 테이블에도 저장
+                if (isDanger) {
+                    
+                    // 문자열(String) -> 이넘(Enum) 변환
+                    AlertSeverity severityEnum = AlertSeverity.LOW; // 기본값
+                    try {
+                        // "DANGER" -> AlertSeverity.DANGER 변환
+                        severityEnum = AlertSeverity.valueOf(severityStr);
+                    } catch (Exception e) {
+                        // 혹시 오타가 났거나 매칭 안 되면 기본값 HIGH로 설정
+                        severityEnum = AlertSeverity.HIGH;
+                    }
+
+                    CrisisAlert alert = CrisisAlert.builder()
+                            .member(member)
+                            .session(session)
+                            .analysis(analysis)
+                            .alertSeverity(severityEnum) 
+                            .alertStatus(AlertStatus.RESOLVED) 
+                            .build();
+                    
+                    crisisAlertRepository.save(alert);
+                    
+                    logger.warn("🚨 위기 상황 감지됨! User: {}, Session: {}", member.getNickname(), sessionId);
+                }
             }
 
             // 5. 세션 업데이트 (시간, 제목)
@@ -287,28 +356,7 @@ public class SessionService {
             // 실무 팁: 여기서 에러나면 사용자에게 티가 안 나므로, 운영자가 알 수 있게 로그를 잘 남겨야 합니다.
         }
     }
-    
-     // [수동] 상담 종료
-     
-    @Transactional
-    public void endSessionManually(Long sessionId, Member member) {
-        CounsellingSession session = sessionRepository.findBySessionIdAndMember(sessionId, member)
-                .orElseThrow(() -> new RuntimeException("세션이 없거나 권한이 없습니다."));
 
-        // 이미 끝난 세션이면 무시
-        if (session.getCompletionStatus() != CompletionStatus.ONGOING) {
-            return; 
-        }
-
-        // 종료 처리
-        session.updateStatus(CompletionStatus.COMPLETED); // 수동 종료는 COMPLETED
-        session.updateendTime(LocalDateTime.now());
-        
-        // (선택) 종료 메시지 남기기
-        saveSystemMessage(session, "상담이 종료되었습니다.");
-    }
-
-    
      // [수동] 상담 재시작
     @Transactional
     public void restartSessionManually(Long sessionId, Member member) {
@@ -344,5 +392,38 @@ public class SessionService {
 			return "{\"error\":\"JSON 변환 실패\"}";
 		}
 	}
+	
+	// ==========================================
+    // [관리자] 상담 로그 검색 (닉네임 + 상태 필터링)
+    // ==========================================
+    @Transactional(readOnly = true)
+    public List<CounselLogDto> findAllAdminLogs(String nickname, String statusStr) {
+        
+        // 1. String("PROGRESS") -> Enum(CompletionStatus.PROGRESS) 변환
+        CompletionStatus status = null;
+        if (statusStr != null && !statusStr.trim().isEmpty() && !statusStr.equals("전체")) {
+            try {
+                // 프론트에서 대문자로 보내므로 바로 변환 시도
+                status = CompletionStatus.valueOf(statusStr);
+            } catch (IllegalArgumentException e) {
+                // 잘못된 값이면 필터링 안 함 (null)
+                status = null;
+            }
+        }
+
+        // 2. 닉네임 공백 체크 ("" -> null)
+        if (nickname != null && nickname.trim().isEmpty()) {
+            nickname = null;
+        }
+
+        // 3. Repository 동적 쿼리 호출 (앞서 추가한 findAdminLogsByFilter 사용)
+        List<CounsellingSession> sessions = sessionRepository.findAdminLogsByFilter(nickname, status);
+
+        // 4. Entity -> DTO 변환 후 반환
+        return sessions.stream()
+                .map(CounselLogDto::fromEntity) // DTO에 static from 메서드가 있다고 가정
+                // 만약 from이 없다면: .map(s -> new CounselLogDto(s)) 로 수정
+                .collect(Collectors.toList());
+    }
 
 }
